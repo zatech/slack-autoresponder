@@ -43,26 +43,15 @@ if slack_client.rtm_connect():
                 channel = event['channel']
                 text = event['text']
                 user = event['user']
-                if('thread_ts' in event):
-                    thread_ts = event['thread_ts']
-                else:    
-                    thread_ts = event['ts']
-                if 'C' in channel[0]:
-
-                   for hit in hits:
-                       if hit in text.lower():
-                            slack_client.api_call(
-                                'chat.postMessage',
-                                channel=channel,
-                                thread_ts=thread_ts,
-                                text=responses[randint(0, len(responses)-1)],
-                                as_user='false',
-                                icon_url='https://s3-us-west-2.amazonaws.com/slack-files2/avatars/2015-05-18/4929001832_f10a5167e072681794c2_88.jpg',
-                                unfurl_links='false',
-                                unfurl_media='false',
-                                username='ZATech Community Manager'
+                for hit in hits:
+                    if hit in text.lower():
+                        slack_client.api_call(
+                            'chat.postEphemeral',
+                             channel=channel,
+                             text=responses[randint(0, len(responses)-1)],
+                             user = user,
                             )
-                            break
+                        break
         time.sleep(1)
 else:
     print('Connection failed, invalid token?')
