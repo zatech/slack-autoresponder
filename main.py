@@ -50,6 +50,7 @@ if slack_client.rtm_connect():
                              channel=channel,
                              text=responses[randint(0, len(responses)-1)],
                              user = user,
+                             as_user = 'true',
                             )
                         break
         time.sleep(1)
