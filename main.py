@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 import os
 import time
-from random import randint
+from random import choice
 from pprint import pprint
 
 from slackclient import SlackClient
@@ -19,16 +19,16 @@ def run_bot():
         "thanks guys",
         "the guys",
         "these guys",
-        "these guys",
         "those guys",
         "you guys",
     ]
     
+    base_response = 'Some people in the community find "guys" alienating, next time would you consider {}? :slightly_smiling_face: (<http://bit.ly/2uJCn3y|Learn more>)',
     responses = [
-        'Some people in the community find "guys" alienating, next time would you consider folks? :slightly_smiling_face: (<http://bit.ly/2uJCn3y|Learn more>)',
-        'Some people in the community find "guys" alienating, next time would you consider all? :slightly_smiling_face: (<http://bit.ly/2uJCn3y|Learn more>)',
-        'Some people in the community find "guys" alienating, next time would you consider y\'all? :slightly_smiling_face: (<http://bit.ly/2uJCn3y|Learn more>)',
-        'Some people in the community find "guys" alienating, next time would you consider everyone? :slightly_smiling_face: (<http://bit.ly/2uJCn3y|Learn more>)'
+        'all',
+        'everyone',
+        'folks',
+        'y\'all',
     ]
     
     if slack_client.rtm_connect():
@@ -43,8 +43,7 @@ def run_bot():
                         slack_client.api_call(
                             'chat.postEphemeral',
                             channel=channel,
-                            text=responses[randint(0,
-                                                   len(responses) - 1)],
+                            text=base_response.format(choice(response)),
                             user=user,
                             as_user='true',
                         )
