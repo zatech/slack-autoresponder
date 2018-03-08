@@ -34,7 +34,10 @@ def run_bot():
 
     if slack_client.rtm_connect():
         while True:
-            events = slack_client.rtm_read()
+            try:
+                events = slack_client.rtm_read()
+            except Exception as exc:
+                print("Exception during slack_client.rtm_read", exc, event)
             for event in events:
                 if event.get('type') != 'message':
                     continue
@@ -50,9 +53,8 @@ def run_bot():
                             user=user,
                             as_user='true',
                         )
-                        print(response)
                 except Exception as exc:
-                    print("Exception", exc)
+                    print("Exception while processing message", exc, event)
 
             time.sleep(1)
     else:
