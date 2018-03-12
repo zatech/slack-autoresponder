@@ -1,8 +1,8 @@
 #!/usr/bin/env python
+import logging
 import os
 import time
 from random import choice
-from pprint import pprint
 
 from slackclient import SlackClient
 
@@ -32,33 +32,38 @@ def run_bot():
         'y\'all',
     ]
 
-    if slack_client.rtm_connect():
-        while True:
-            try:
-                events = slack_client.rtm_read()
-            except Exception as exc:
-                print("Exception during slack_client.rtm_read", exc, event)
-            for event in events:
-                if event.get('type') != 'message':
-                    continue
+    while True:
+        if slack_client.rtm_connect():
+            print('slack_client RTM connected')
+            while True:
                 try:
-                    channel = event['channel']
-                    text = event['text']
-                    user = event['user']
-                    if any(hit in text.lower() for hit in hits):
-                        response = slack_client.api_call(
-                            'chat.postEphemeral',
-                            channel=channel,
-                            text=base_response.format(choice(responses)),
-                            user=user,
-                            as_user='true',
-                        )
+                    events = slack_client.rtm_read()
                 except Exception as exc:
-                    print("Exception while processing message", exc, event)
-
-            time.sleep(1)
-    else:
-        print('Connection failed, invalid token?')
+                    logging.error("Exception during slack_client.rtm_read", exc, events)
+                    break
+                for event in events:
+                    if event.get('type') != 'message':
+                        continue
+                    try:
+                        if 'text' not in event:
+                            continue
+                        channel = event['channel']
+                        text = event['text']
+                        user = event['user']
+                        if any(hit in text.lower() for hit in hits):
+                            response = slack_client.api_call(
+                                'chat.postEphemeral',
+                                channel=channel,
+                                text=base_response.format(choice(responses)),
+                                user=user,
+                                as_user='true',
+                            )
+                    except Exception as exc:
+                        logging.error("Exception while processing message", exc, event)
+                time.sleep(1)
+        else:
+            logging.error('Connection failed, invalid token?')
+            break
 
 
 if __name__ == '__main__':
