@@ -66,7 +66,7 @@ def run_bot():
         'you guys',
     ]
 
-    base_response = 'Some people in the community find "guys" alienating, next time would you consider {}? :slightly_smiling_face: (<http://bit.ly/2uJCn3y|Learn more>)'
+    base_response = 'Some people in the community find "guys" alienating, next time would you consider _{}_? :slightly_smiling_face: (<http://bit.ly/2uJCn3y|Learn more>)'
     responses = [
         'all',
         'everyone',
