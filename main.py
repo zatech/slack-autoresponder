@@ -1,16 +1,58 @@
 #!/usr/bin/env python
+import json
 import logging
 import os
+import threading
 import time
+from collections import defaultdict
+from datetime import datetime
 from random import choice
+from time import sleep
 
+from requests import post
 from slackclient import SlackClient
 
 
 def run_bot():
     token = os.environ.get('SLACKBOT_TOKEN')
-
+    report_url = os.environ.get('SLACKBOT_REPORT_URL')
     slack_client = SlackClient(token)
+
+    global metrics
+    metrics = None
+    users = {u['id']:  u['name'] for u in slack_client.api_call("users.list")['members']}
+    channels = {u['id']:  u['name'] for u in slack_client.api_call('channels.list')['channels']}
+
+    if report_url:
+        # Reports are enabled, so start reporting thread
+        global last_run
+        last_run = None
+        metrics = defaultdict(int)
+
+        class ReportingThread(threading.Thread):
+            def run(self):
+                while True:
+                    curr_min = datetime.utcnow().minute
+                    global last_run
+                    global metrics
+                    if last_run == curr_min:
+                        sleep(5)
+                        continue
+                    last_run = curr_min
+                    if not metrics:
+                        continue
+                    try:
+                        metrics = json.dumps(metrics)
+                        resp = post(
+                            url=report_url,
+                            json=dict(text=metrics))
+                        resp.raise_for_status()
+                    except Exception as exc:
+                        print(exc)
+                    metrics = defaultdict(int)
+
+        reporting = ReportingThread(name='Reporting Thread')
+        reporting.start()
 
     hits = [
         'guyz',
@@ -60,6 +102,11 @@ def run_bot():
                                 user=user,
                                 as_user='true',
                             )
+                            if metrics is not None:
+                                channel = channels.get(channel)
+                                user = users.get(user)
+                                if user and channel:
+                                    metrics['{}-{}'.format(channel, user)] += 1
                     except Exception as exc:
                         logging.error('Exception while processing message', exc, event)
                 time.sleep(1)
