@@ -13,15 +13,68 @@ from requests import post
 from slackclient import SlackClient
 
 
+HITS = [
+    'guyz',
+    'hey guys',
+    'hi guys',
+    'my guys',
+    'thanks guys',
+    'the guys',
+    'these guys',
+    'those guys',
+    'you guys',
+]
+
+BASE_RESPONSE = 'Some people in the community find "guys" alienating, next time would you consider _{}_? :slightly_smiling_face: (<http://bit.ly/2uJCn3y|Learn more>)'
+
+RESPONSES = [
+    'all',
+    'everyone',
+    'folks',
+    'y\'all',
+]
+
+
+def process_message_event(client, event):
+    try:
+        if 'text' not in event:
+            return
+        channel = event['channel']
+        text = event['text']
+        if 'user' not in event:
+            return
+        user = event['user']
+        if any(hit in text.lower() for hit in HITS):
+            client.api_call(
+                'chat.postEphemeral',
+                channel=channel,
+                text=BASE_RESPONSE.format(choice(RESPONSES)),
+                user=user,
+                as_user='true',
+            )
+            global metrics
+            if metrics is not None:
+                global channels
+                channel = channels.get(channel)
+                global users
+                user = users.get(user)
+                if user and channel:
+                    metrics['{}-{}'.format(channel, user)] += 1
+    except Exception as exc:
+        logging.error('Exception while processing message', exc, event)
+
+
 def run_bot():
     token = os.environ.get('SLACKBOT_TOKEN')
     report_url = os.environ.get('SLACKBOT_REPORT_URL')
-    slack_client = SlackClient(token)
+    client = SlackClient(token)
 
     global metrics
     metrics = None
-    users = {u['id']:  u['name'] for u in slack_client.api_call("users.list")['members']}
-    channels = {u['id']:  u['name'] for u in slack_client.api_call('channels.list')['channels']}
+    global users
+    users = {u['id']: u['name'] for u in client.api_call("users.list")['members']}
+    global channels
+    channels = {u['id']: u['name'] for u in client.api_call('channels.list')['channels']}
 
     if report_url:
         # Reports are enabled, so start reporting thread
@@ -54,61 +107,18 @@ def run_bot():
         reporting = ReportingThread(name='Reporting Thread')
         reporting.start()
 
-    hits = [
-        'guyz',
-        'hey guys',
-        'hi guys',
-        'my guys',
-        'thanks guys',
-        'the guys',
-        'these guys',
-        'those guys',
-        'you guys',
-    ]
-
-    base_response = 'Some people in the community find "guys" alienating, next time would you consider _{}_? :slightly_smiling_face: (<http://bit.ly/2uJCn3y|Learn more>)'
-    responses = [
-        'all',
-        'everyone',
-        'folks',
-        'y\'all',
-    ]
-
     while True:
-        if slack_client.rtm_connect():
-            print('slack_client RTM connected')
+        if client.rtm_connect():
+            print('Client connected to RTM API')
             while True:
                 try:
-                    events = slack_client.rtm_read()
+                    events = client.rtm_read()
                 except Exception as exc:
                     logging.error('Exception during slack_client.rtm_read', exc, events)
                     break
                 for event in events:
-                    if event.get('type') != 'message':
-                        continue
-                    try:
-                        if 'text' not in event:
-                            continue
-                        channel = event['channel']
-                        text = event['text']
-                        if 'user' not in event:
-                            continue
-                        user = event['user']
-                        if any(hit in text.lower() for hit in hits):
-                            response = slack_client.api_call(
-                                'chat.postEphemeral',
-                                channel=channel,
-                                text=base_response.format(choice(responses)),
-                                user=user,
-                                as_user='true',
-                            )
-                            if metrics is not None:
-                                channel = channels.get(channel)
-                                user = users.get(user)
-                                if user and channel:
-                                    metrics['{}-{}'.format(channel, user)] += 1
-                    except Exception as exc:
-                        logging.error('Exception while processing message', exc, event)
+                    if event.get('type') == 'message':
+                        process_message_event(client, event)
                 time.sleep(1)
         else:
             logging.error('Connection failed, invalid token?')
