@@ -64,9 +64,25 @@ def process_message_event(client, event):
         logging.error('Exception while processing message', exc, event)
 
 
+def process_emoji_event(client, event, channel):
+    try:
+        if event['subtype'] != 'add':
+            return
+        name = event['name']
+        client.api_call(
+            'chat.postMessage',
+            channel=channel,
+            text='Someone has added a new emoji: :{}:'.format(name),
+            as_user=True,
+        )
+    except Exception as exc:
+        logging.error('Exception while processing emoji event', exc, event)
+
+
 def run_bot():
     token = os.environ.get('SLACKBOT_TOKEN')
     report_url = os.environ.get('SLACKBOT_REPORT_URL')
+    new_emoji_channel = os.environ.get('SLACKBOT_NEW_EMOJI_CHANNEL')
     client = SlackClient(token)
 
     global metrics
@@ -119,6 +135,8 @@ def run_bot():
                 for event in events:
                     if event.get('type') == 'message':
                         process_message_event(client, event)
+                    elif event.get('type') == 'emoji_changed':
+                        process_emoji_event(client, event, new_emoji_channel)
                 time.sleep(1)
         else:
             logging.error('Connection failed, invalid token?')
