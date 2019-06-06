@@ -12,6 +12,9 @@ from time import sleep
 from requests import post
 from slackclient import SlackClient
 
+EXCLUDE_USERS = [
+    'UC2PXG134'
+]
 
 HITS = [
     'guyz',
@@ -45,6 +48,8 @@ def process_message_event(client, event):
             return
         user = event['user']
         if any(hit in text.lower() for hit in HITS):
+            if any(excludeUser.lower() in user.lower() for excludeUser in EXCLUDE_USERS):
+                return
             client.api_call(
                 'chat.postEphemeral',
                 channel=channel,
