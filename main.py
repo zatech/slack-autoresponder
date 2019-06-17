@@ -9,8 +9,9 @@ from datetime import datetime
 from random import choice
 from time import sleep
 
+import slack
 from requests import post
-from slackclient import SlackClient
+from slack import RTMClient, WebClient
 
 
 HITS = [
@@ -35,7 +36,11 @@ RESPONSES = [
 ]
 
 
-def process_message_event(client, event):
+@slack.RTMClient.run_on(event='message')
+def process_message_event(**payload):
+    event = payload['data']
+    web_client = payload['web_client']
+
     try:
         if 'text' not in event:
             return
@@ -45,8 +50,7 @@ def process_message_event(client, event):
             return
         user = event['user']
         if any(hit in text.lower() for hit in HITS):
-            client.api_call(
-                'chat.postEphemeral',
+            web_client.chat_postEphemeral(
                 channel=channel,
                 text=BASE_RESPONSE.format(choice(RESPONSES)),
                 user=user,
@@ -64,33 +68,19 @@ def process_message_event(client, event):
         logging.error('Exception while processing message', exc, event)
 
 
-def process_emoji_event(client, event, channel):
-    try:
-        if event['subtype'] != 'add':
-            return
-        name = event['name']
-        client.api_call(
-            'chat.postMessage',
-            channel=channel,
-            text='Someone has added a new emoji: :{}:'.format(name),
-            as_user=True,
-        )
-    except Exception as exc:
-        logging.error('Exception while processing emoji event', exc, event)
-
-
 def run_bot():
     token = os.environ.get('SLACKBOT_TOKEN')
     report_url = os.environ.get('SLACKBOT_REPORT_URL')
-    new_emoji_channel = os.environ.get('SLACKBOT_NEW_EMOJI_CHANNEL')
-    client = SlackClient(token)
+
+    rtm_client = RTMClient(token=token)
+    web_client = WebClient(token=token)
 
     global metrics
     metrics = None
-    global users
-    users = {u['id']: u['name'] for u in client.api_call("users.list")['members']}
     global channels
-    channels = {u['id']: u['name'] for u in client.api_call('channels.list')['channels']}
+    channels = {u['id']: u['name'] for u in web_client.channels_list()['channels']}
+    global users
+    users = {u['id']: u['name'] for u in web_client.users_list()['members']}
 
     if report_url:
         # Reports are enabled, so start reporting thread
@@ -124,23 +114,10 @@ def run_bot():
         reporting.start()
 
     while True:
-        if client.rtm_connect():
-            print('Client connected to RTM API')
-            while True:
-                try:
-                    events = client.rtm_read()
-                except Exception as exc:
-                    logging.error('Exception during slack_client.rtm_read', exc, events)
-                    break
-                for event in events:
-                    if event.get('type') == 'message':
-                        process_message_event(client, event)
-                    elif event.get('type') == 'emoji_changed':
-                        process_emoji_event(client, event, new_emoji_channel)
-                time.sleep(1)
-        else:
-            logging.error('Connection failed, invalid token?')
-            break
+        try:
+            rtm_client.start()
+        except Exception as exc:
+            logging.error('Exception during rtm_client.start', exc)
 
 
 if __name__ == '__main__':
