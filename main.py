@@ -13,6 +13,9 @@ import slack
 from requests import post
 from slack import RTMClient, WebClient
 
+EXCLUDE_USERS = [
+    'UC2PXG134'
+]
 
 HITS = [
     'guyz',
@@ -50,6 +53,8 @@ def process_message_event(**payload):
             return
         user = event['user']
         if any(hit in text.lower() for hit in HITS):
+            if any(excludeUser.lower() in user.lower() for excludeUser in EXCLUDE_USERS):
+                return
             web_client.chat_postEphemeral(
                 channel=channel,
                 text=BASE_RESPONSE.format(choice(RESPONSES)),
